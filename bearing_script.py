@@ -1,0 +1,257 @@
+import copy
+
+# Global Variables
+W_r_p = 3651.06
+W_x_p = 2281.43
+d_p_c = 0.27
+d_p_d = 0.078
+n_in = 1720
+desired_fs = 20
+desired_L_10 = 50000
+
+class bearing:
+
+    def __init__(self, bearing_number, a, C, C_0, e, Y_1, Y_0):
+        self.bearing_number = bearing_number
+        self.a = a
+        self.C = C
+        self.C_0 = C_0
+        self.e = e
+        self.Y_1 = Y_1
+        self.Y_0 = Y_0
+        self.Fr = 0
+        self.P = 0
+        self.L_10 = 0
+        self.L_h = 0
+        self.f_s = 0
+        self.X = 0
+        self.Fa = 0
+        self.P0 = 0
+        self.Y = 0
+
+    def __str__(self):
+
+        return (f"Bearing Details:\n"
+                f"  Number: {self.bearing_number}\n"
+                f"  a:      {self.a}\n"
+                f"  C:      {self.C}\n"
+                f"  C_0:    {self.C_0}\n"
+                f"  e:      {self.e}\n"
+                f"  Y_1:    {self.Y_1}\n"
+                f"  Y_0:    {self.Y_0}\n"
+                f"  Fr:     {self.Fr}\n"
+                f"  P:      {self.P}\n"
+                f"  L_10:   {self.L_10}\n"
+                f"  L_h:    {self.L_h}\n"
+                f"  f_s:    {self.f_s}\n"
+                f"  X:      {self.X}\n"
+                f"  Fa:     {self.Fa}\n"
+                f"  P0:     {self.P0}\n"
+                f"  Y:     {self.Y}\n")
+
+def calculate_F_r_d(bearing_c, bearing_d):
+    """
+    Calculates F_r_d using the specified formula:
+    (-W_r_p * (d_p_c + a_c)) / (d_p_c + d_p_c + a_c + a_d)
+    """
+    # Map attributes from bearing objects
+    a_c = bearing_c.a
+    a_d = bearing_d.a
+
+    # Perform calculation using global variables and mapped attributes
+    numerator = -W_r_p * (d_p_c + a_c)
+    denominator = d_p_c + d_p_c + a_c + a_d
+    
+    ans =  numerator / denominator
+    bearing_d.Fr = abs(ans)
+
+def calculate_F_r_c(bearing_c, bearing_d):
+    ans = -W_r_p - bearing_d.Fr
+    bearing_c.Fr = abs(ans)
+
+def calculate_X_Y1(bearing):
+    if((bearing.Fa / bearing.Fr) <= bearing.e):
+        bearing.X = 1
+        bearing.Y = 0
+    else:
+        bearing.X = 0.4
+        bearing.Y = bearing.Y_1
+
+def calculate_Ps(bearing_c, bearing_d):
+    if((W_x_p + (0.6/bearing_d.Y_1) * bearing_d.Fr) >= ((0.6/bearing_c.Y_1) * bearing_c.Fr)):
+        bearing_c.Fa = (0.6 * bearing_d.Fr) / bearing_d.Y_1
+        bearing_d.Fa = 0
+        calculate_X_Y1(bearing_c)
+        calculate_X_Y1(bearing_d)
+        bearing_c.P = bearing_c.X * bearing_c.Fr + bearing_c.Y_1 * (W_x_p + (0.6 * bearing_d.Fr) / bearing_d.Y_1)
+        bearing_d.P = bearing_d.Fr
+        bearing_d.Fa = 0
+    else:
+        bearing_d.Fa = 0.6*bearing_c.Fr/bearing_c.Y_1
+        bearing_c.Fa = 0
+        calculate_X_Y1(bearing_c)
+        calculate_X_Y1(bearing_d)
+        bearing_c.P = bearing_c.Fr
+        bearing_c.Fa = 0
+        bearing_d.P = bearing_d.X * bearing_d.Fr + bearing_d.Y_1 * ((0.6*bearing_c.Fr/bearing_c.Y_1 ) - W_x_p)
+        
+def calculate_L10(bearing):
+    ans = pow((bearing.C / bearing.P), 10/3)
+    bearing.L_10 = ans
+
+def calculate_LH(bearing):
+    ans = (bearing.L_10 * pow(10, 6)) / (60 * n_in)
+    bearing.L_h = ans
+
+def calculate_P0(bearing):
+    if(bearing.Fr > 0.5*bearing.Fr + bearing.Y_0 * bearing.Fa):
+        bearing.P0 = bearing.Fr
+    else:
+        bearing.P0 = abs(0.5 * bearing.Fr + bearing.Y_0 * bearing.Fa)
+
+def calculate_f_s(bearing):
+    ans = bearing.C_0 / bearing.P0
+    bearing.f_s = ans
+
+def perform_all_calculations(bearing_c, bearing_d):
+    calculate_F_r_d(bearing_c, bearing_d)
+    calculate_F_r_c(bearing_c, bearing_d)
+    calculate_Ps(bearing_c, bearing_d)
+    calculate_L10(bearing_c)
+    calculate_L10(bearing_d)
+    calculate_LH(bearing_c)
+    calculate_LH(bearing_d)
+    calculate_P0(bearing_c)
+    calculate_P0(bearing_d)
+    calculate_f_s(bearing_c)
+    calculate_f_s(bearing_d)
+
+# --- Example Usage ---
+if __name__ == "__main__":
+    # List to hold all bearing instances
+    all_bearings = []
+
+    # --- From Image 1 (image_a3d744.jpg) ---
+
+    # d = 55 mm
+    all_bearings.append(bearing("HR 32911 J", 14.6, 45500, 74500, 0.31, 1.9, 1.1))
+    all_bearings.append(bearing("HR 32011 XJ", 19.7, 81500, 117000, 0.41, 1.4, 0.81))
+    all_bearings.append(bearing("HR 33011 J", 19.2, 91500, 138000, 0.31, 1.9, 1.1))
+    all_bearings.append(bearing("HR 33111 J", 22.4, 112000, 158000, 0.37, 1.6, 0.88))
+    all_bearings.append(bearing("HR 30211 J", 20.9, 94500, 113000, 0.41, 1.5, 0.81))
+    all_bearings.append(bearing("HR 32211 J", 22.7, 110000, 137000, 0.41, 1.5, 0.81))
+    all_bearings.append(bearing("HR 33211 J", 25.2, 141000, 193000, 0.40, 1.5, 0.83))
+    all_bearings.append(bearing("T7 FC055", 39.0, 126000, 164000, 0.87, 0.69, 0.38))
+    all_bearings.append(bearing("HR 30311 J", 24.6, 150000, 171000, 0.35, 1.7, 0.96))
+    all_bearings.append(bearing("HR 30311 DJ", 37.0, 131000, 153000, 0.83, 0.73, 0.40))
+    all_bearings.append(bearing("HR 31311 J", 37.0, 131000, 153000, 0.83, 0.73, 0.40))
+    all_bearings.append(bearing("HR 32311 J", 29.9, 204000, 258000, 0.35, 1.7, 0.96))
+    all_bearings.append(bearing("HR 32311 CJ", 35.8, 195000, 262000, 0.55, 1.1, 0.60))
+
+    # d = 60 mm
+    all_bearings.append(bearing("HR 32912 J", 15.5, 49000, 84500, 0.33, 1.8, 1.0))
+    all_bearings.append(bearing("HR 32012 XJ", 20.9, 85500, 127000, 0.43, 1.4, 0.77))
+    all_bearings.append(bearing("HR 33012 J", 20.0, 96000, 150000, 0.33, 1.8, 1.0))
+    all_bearings.append(bearing("HR 33112 J", 23.6, 115000, 166000, 0.40, 1.5, 0.83))
+    all_bearings.append(bearing("HR 30212 J", 22.0, 104000, 123000, 0.41, 1.5, 0.81))
+    all_bearings.append(bearing("HR 32212 J", 24.1, 131000, 167000, 0.41, 1.5, 0.81))
+    all_bearings.append(bearing("HR 33212 J", 27.6, 166000, 231000, 0.40, 1.5, 0.82))
+    all_bearings.append(bearing("T7 FC060", 41.4, 151000, 197000, 0.82, 0.73, 0.40))
+    all_bearings.append(bearing("HR 30312 J", 26.0, 174000, 201000, 0.35, 1.7, 0.96))
+    all_bearings.append(bearing("HR 30312 DJ", 40.3, 151000, 177000, 0.83, 0.73, 0.40))
+    all_bearings.append(bearing("HR 31312 J", 40.3, 151000, 177000, 0.83, 0.73, 0.40))
+    all_bearings.append(bearing("HR 32312 J", 31.4, 233000, 295000, 0.35, 1.7, 0.96))
+    all_bearings.append(bearing("HR 32312 C", 39.9, 196000, 249000, 0.58, 1.0, 0.57))
+
+    # d = 65 mm
+    all_bearings.append(bearing("HR 32913 J", 16.8, 49000, 86500, 0.35, 1.7, 0.93))
+    all_bearings.append(bearing("HR 32013 XJ", 22.4, 86500, 132000, 0.46, 1.3, 0.72))
+    all_bearings.append(bearing("HR 33013 J", 21.1, 97500, 156000, 0.35, 1.7, 0.95))
+    all_bearings.append(bearing("HR 33113 J", 26.0, 148000, 218000, 0.39, 1.5, 0.85))
+    all_bearings.append(bearing("HR 30213 J", 23.8, 122000, 151000, 0.41, 1.5, 0.81))
+    all_bearings.append(bearing("HR 32213 J", 27.1, 157000, 202000, 0.41, 1.5, 0.81))
+    all_bearings.append(bearing("HR 33213 J", 29.2, 202000, 282000, 0.39, 1.5, 0.85))
+    all_bearings.append(bearing("HR 30313 J", 27.9, 200000, 233000, 0.35, 1.7, 0.96))
+    all_bearings.append(bearing("HR 30313 DJ", 43.2, 173000, 205000, 0.83, 0.73, 0.40))
+    all_bearings.append(bearing("HR 31313 J", 43.2, 173000, 205000, 0.83, 0.73, 0.40))
+    all_bearings.append(bearing("HR 32313 J", 34.0, 267000, 340000, 0.35, 1.7, 0.96))
+
+    # --- From Image 2 (image_a3d799.jpg) ---
+
+    # d = 70 mm
+    all_bearings.append(bearing("HR 32914 J", 17.6, 70000, 113000, 0.32, 1.9, 1.1))
+    all_bearings.append(bearing("HR 32014 XJ", 23.7, 104000, 158000, 0.43, 1.4, 0.76))
+    all_bearings.append(bearing("HR 33014 J", 22.2, 127000, 204000, 0.28, 2.1, 1.2))
+    all_bearings.append(bearing("HR 33114 J", 27.9, 177000, 262000, 0.38, 1.6, 0.87))
+    all_bearings.append(bearing("HR 30214 J", 25.6, 132000, 163000, 0.42, 1.4, 0.79))
+    all_bearings.append(bearing("HR 32214 J", 28.6, 157000, 205000, 0.42, 1.4, 0.79))
+    all_bearings.append(bearing("HR 33214 J", 30.4, 209000, 299000, 0.41, 1.5, 0.81))
+    all_bearings.append(bearing("T7 FC070", 46.4, 177000, 229000, 0.87, 0.69, 0.38))
+    all_bearings.append(bearing("HR 30314 J", 29.7, 227000, 268000, 0.35, 1.7, 0.96))
+    all_bearings.append(bearing("HR 30314 DJ", 45.8, 192000, 229000, 0.83, 0.73, 0.40))
+    all_bearings.append(bearing("HR 31314 J", 45.8, 192000, 229000, 0.83, 0.73, 0.40))
+    all_bearings.append(bearing("HR 32314 J", 36.1, 300000, 390000, 0.35, 1.7, 0.96))
+    all_bearings.append(bearing("HR 32314 CJ", 43.3, 280000, 390000, 0.55, 1.1, 0.60))
+
+    # d = 75 mm
+    all_bearings.append(bearing("HR 32915 J", 18.7, 72500, 120000, 0.33, 1.8, 0.99))
+    all_bearings.append(bearing("HR 32015 XJ", 25.1, 109000, 171000, 0.46, 1.3, 0.72))
+    all_bearings.append(bearing("HR 33015 J", 23.0, 133000, 220000, 0.30, 2.0, 1.1))
+    all_bearings.append(bearing("HR 33115 J", 29.2, 182000, 275000, 0.40, 1.5, 0.83))
+    all_bearings.append(bearing("HR 30215 J", 27.0, 143000, 182000, 0.44, 1.4, 0.76))
+    all_bearings.append(bearing("HR 32215 J", 29.8, 165000, 219000, 0.44, 1.4, 0.76))
+    all_bearings.append(bearing("HR 33215 J", 31.6, 215000, 315000, 0.43, 1.4, 0.77))
+    all_bearings.append(bearing("HR 30315 J", 31.8, 253000, 300000, 0.35, 1.7, 0.96))
+    all_bearings.append(bearing("HR 30315 DJ", 48.8, 211000, 251000, 0.83, 0.73, 0.40))
+    all_bearings.append(bearing("HR 31315 J", 48.8, 211000, 251000, 0.83, 0.73, 0.40))
+    all_bearings.append(bearing("HR 32315 J", 38.9, 340000, 445000, 0.35, 1.7, 0.96))
+    all_bearings.append(bearing("32315 CA", 47.7, 310000, 420000, 0.58, 1.0, 0.57))
+
+    # d = 80 mm
+    all_bearings.append(bearing("HR 32916 J", 19.8, 75000, 128000, 0.35, 1.7, 0.94))
+    all_bearings.append(bearing("HR 32016 XJ", 26.9, 140000, 222000, 0.42, 1.4, 0.78))
+    all_bearings.append(bearing("HR 33016 J", 25.5, 172000, 282000, 0.28, 2.2, 1.2))
+    all_bearings.append(bearing("HR 33116 J", 30.4, 186000, 289000, 0.42, 1.4, 0.79))
+    all_bearings.append(bearing("HR 30216 J", 28.1, 157000, 195000, 0.42, 1.4, 0.79))
+    all_bearings.append(bearing("30216 CA", 33.8, 147000, 190000, 0.58, 1.0, 0.57))
+    all_bearings.append(bearing("HR 32216 J", 30.6, 192000, 254000, 0.42, 1.4, 0.79))
+    all_bearings.append(bearing("HR 33216 J", 34.8, 256000, 385000, 0.43, 1.4, 0.78))
+    all_bearings.append(bearing("HR 30316 J", 34.0, 276000, 330000, 0.35, 1.7, 0.96))
+    all_bearings.append(bearing("HR 30316 DJ", 51.8, 235000, 283000, 0.83, 0.73, 0.40))
+    all_bearings.append(bearing("HR 31316 J", 51.8, 235000, 283000, 0.83, 0.73, 0.40))
+    all_bearings.append(bearing("HR 32316 J", 41.4, 385000, 505000, 0.35, 1.7, 0.96))
+
+
+    print(f"\nSearching for all combinations where L_h > {desired_L_10} and f_s > {desired_fs}...\n")
+    
+    # Print Table Header
+    print(f"{'Bearing C':<15} {'Bearing D':<15} {'L_h (C)':<12} {'L_h (D)':<12} {'f_s (C)':<10} {'f_s (D)':<10} {'weighted sum':<10}")
+    print("-" * 80)
+    
+    valid_count = 0
+
+    # Format: (C_Name, C_Lh, C_FS), (D_Name, D_Lh, D_FS)
+    bearing_values = [] 
+    
+    for bearing_c in all_bearings:
+        for bearing_d in all_bearings:
+            
+            # Run calculations
+            perform_all_calculations(bearing_c, bearing_d)
+            if(bearing_c.L_h >= desired_L_10 and bearing_d.L_h >= desired_L_10 and bearing_c.f_s > desired_fs and bearing_d.f_s > desired_fs):
+                weighted_sum = bearing_c.L_h + bearing_d.L_h + bearing_c.f_s * 2500 + bearing_d.f_s * 2500
+                bearing_values.append(((bearing_c.bearing_number, bearing_c.L_h, bearing_c.f_s), (bearing_d.bearing_number, bearing_d.L_h, bearing_d.f_s), weighted_sum))
+    
+    # write to bearing_output.txt with good formatting 
+    with open('bearing_output.txt', 'w') as f:
+        for combo in bearing_values:
+            f.write(f"{combo[0][0]} {combo[0][1]} {combo[0][2]} {combo[1][0]} {combo[1][1]} {combo[1][2]} {combo[2]}\n")
+    
+    # Find the combination with the smallest weighted_sum
+    if bearing_values:
+        min_combo = min(bearing_values, key=lambda x: x[2])
+        print(f"The combination with the smallest weighted sum is: {min_combo}")
+    else:
+        print("No valid combinations found.")
+    
+    
